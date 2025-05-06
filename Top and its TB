@@ -1,0 +1,88 @@
+1) UART Top Module (UART Loopback)
+
+module uart_top (
+input clk,
+input rst,
+input tx_start,
+input [7:0] tx_data,
+output [7:0] rx_data,
+output rx_done,
+output tx_busy,
+output rx_busy
+);
+wire tx_line;
+uart_tx tx_inst (
+.clk(clk),
+.rst(rst),
+.tx_start(tx_start),
+.tx_data(tx_data),
+.tx(tx_line),
+.tx_busy(tx_busy)
+);
+uart_rx rx_inst (
+.clk(clk),
+.rst(rst),
+.rx(tx_line), // Loopback connection
+.rx_done(rx_done),
+.rx_data(rx_data),
+.rx_busy(rx_busy)
+);
+endmodule
+
+
+2) UART Testbench
+
+`timescale 1ns/1ps
+module uart_tb;
+// Clock and Reset
+reg clk = 0;
+reg rst = 1;
+// TX Interface
+reg tx_start = 0;
+reg [7:0] tx_data = 8'h00;
+wire tx;
+wire tx_busy;
+// RX Interface
+wire rx_done;
+wire [7:0] rx_data;
+wire rx_busy;
+// Generate 50MHz Clock (20ns period)
+always #10 clk = ~clk;
+// Instantiate TX module
+uart_tx #(.CLKS_PER_BIT(32'd16)) tx_inst (
+.clk(clk),
+.rst(rst),
+.tx_start(tx_start),
+.tx_data(tx_data),
+.tx(tx),
+.tx_busy(tx_busy)
+);
+// Instantiate RX module (connect RX to TX line)
+uart_rx #(.CLKS_PER_BIT(32'd16)) rx_inst (
+.clk(clk),
+.rst(rst),
+.rx(tx),
+.rx_done(rx_done),
+.rx_data(rx_data),
+.rx_busy(rx_busy)
+);
+// Stimulus
+initial begin
+// Initial reset
+#50;
+rst = 0;
+// Wait a bit before sending
+#100;
+// Send byte A5
+tx_data = 8'hA5;
+tx_start = 1;
+#20;
+tx_start = 0;
+// Wait for RX to finish
+wait (rx_done);
+$display("Received Data: %h", rx_data);
+// Wait and finish
+#200;
+$stop;
+end
+endmodule
